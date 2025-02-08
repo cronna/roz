@@ -139,3 +139,6 @@ async def finish_giveaway(giveaway_id, winner_id):
         giveaway.winner_id = winner_id
         await session.commit()
         return True
+    
+async def generate_giveaway_link(giveaway_id: int) -> str:
+    return f"https://t.me/givegive2323bot/givegive2323bot?startapp=giveaway_{giveaway_id}"

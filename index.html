@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Розыгрыш</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 20px 0;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .channel-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            float: right;
+            font-weight: bold;
+        }
+        .subscribed {
+            color: green;
+        }
+        .not-subscribed {
+            color: red;
+        }
+        .error-message {
+            color: red;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Loading State -->
+        <div id="loading" class="loading">
+            Загрузка данных о розыгрыше...
+        </div>
+
+        <!-- Content -->
+        <div id="content" style="display: none;">
+            <!-- Completed Giveaway -->
+            <div id="completed-view" style="display: none;">
+                <h2>🎉 Розыгрыш завершен!</h2>
+                <p id="winner-info"></p>
+            </div>
+
+            <!-- Active Giveaway -->
+            <div id="active-view" style="display: none;">
+                <h1 id="giveaway-name"></h1>
+                <p id="giveaway-description"></p>
+
+                <div id="channels-list"></div>
+
+                <button id="participate-btn" class="btn" disabled>
+                    Участвовать
+                </button>
+
+                <div id="result-message"></div>
+            </div>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-view" class="error-message" style="display: none;"></div>
+    </div>
+
+    <script>
+        const webApp = Telegram.WebApp;
+        let giveawayData = null;
+
+        // Initialize Web App
+        webApp.ready();
+        webApp.expand();
+
+        // Get giveaway_id from URL
+        const params = new URLSearchParams(window.location.search);
+        const giveawayId = params.get('giveaway_id');
+
+        if (!giveawayId) {
+            showError("Не указан ID розыгрыша");
+        } else {
+            loadGiveawayInfo();
+        }
+
+        async function loadGiveawayInfo() {
+            try {
+                const response = await fetch(`https://ваш-домен/api/giveaway/${giveawayId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    giveawayData = data.giveaway;
+                    updateUI();
+                    checkSubscriptions();
+                } else {
+                    showError(data.error || "Не удалось загрузить данные о розыгрыше");
+                }
+            } catch (error) {
+                showError("Ошибка при загрузке данных");
+                console.error(error);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+            }
+        }
+
+        function updateUI() {
+            if (giveawayData.winner) {
+                // Show completed giveaway view
+                document.getElementById('completed-view').style.display = 'block';
+                document.getElementById('winner-info').textContent = 
+                    `Победитель: @${giveawayData.winner.username}`;
+                return;
+            }
+
+            // Show active giveaway view
+            document.getElementById('active-view').style.display = 'block';
+            document.getElementById('giveaway-name').textContent = giveawayData.name;
+            document.getElementById('giveaway-description').textContent = giveawayData.description;
+
+            // Render channels list
+            const channelsList = document.getElementById('channels-list');
+            giveawayData.channels.forEach(channel => {
+                const channelElement = document.createElement('div');
+                channelElement.className = 'channel-item';
+                channelElement.innerHTML = `
+                    <a href="${channel.invite_link}" target="_blank">
+                        ${channel.title}
+                    </a>
+                    <span class="status not-subscribed" id="status-${channel.id}">✗</span>
+                `;
+                channelsList.appendChild(channelElement);
+            });
+        }
+
+        async function checkSubscriptions() {
+            try {
+                const channelsToCheck = giveawayData.channels.map(c => c.tg_id);
+                const user = webApp.initDataUnsafe.user;
+
+                // Check subscriptions via your backend
+                const response = await fetch('https://ваш-домен/api/check-subscriptions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: user.id,
+                        channel_ids: channelsToCheck
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const allSubscribed = result.data.every(subscribed => subscribed);
+                    document.getElementById('participate-btn').disabled = !allSubscribed;
+
+                    // Update subscription statuses
+                    result.data.forEach((isSubscribed, index) => {
+                        const statusElement = document.getElementById(`status-${giveawayData.channels[index].id}`);
+                        statusElement.textContent = isSubscribed ? '✓' : '✗';
+                        statusElement.className = `status ${isSubscribed ? 'subscribed' : 'not-subscribed'}`;
+                    });
+                }
+            } catch (error) {
+                console.error('Ошибка проверки подписок:', error);
+            }
+        }
+
+        async function participate() {
+            try {
+                const user = webApp.initDataUnsafe.user;
+                
+                const response = await fetch('https://ваш-домен/api/participate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        giveaway_id: giveawayId,
+                        user_id: user.id
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('result-message').textContent = "🎉 Вы успешно присоединились к розыгрышу!";
+                    document.getElementById('participate-btn').disabled = true;
+                } else {
+                    document.getElementById('result-message').textContent = result.error || "Ошибка при участии";
+                }
+            } catch (error) {
+                document.getElementById('result-message').textContent = "Ошибка при отправке данных";
+                console.error(error);
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'none';
+            document.getElementById('error-view').style.display = 'block';
+            document.getElementById('error-view').textContent = message;
+        }
+
+        // Event Listeners
+        document.getElementById('participate-btn').addEventListener('click', participate);
+    </script>
+</body>
+</html>
