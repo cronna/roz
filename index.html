@@ -3,95 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Конкурс</title>
+    <title>Участие в розыгрыше</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
             margin: 0;
-            padding: 0;
-            height: 100vh;
-            background-image: url('base.jpg');
-            background-size: cover;
-            background-position: center;
+            padding: 20px;
             font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
+            background: #f0f2f5;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
         }
         .button {
-            padding: 15px 90px;
-            background-color: rgb(25, 124, 101);
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background: #2481cc;
             color: white;
-            font-size: 24px;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
+            font-size: 16px;
             cursor: pointer;
-            transition: background-color 0.3s;
+            text-align: center;
+            text-decoration: none;
         }
-        .button:hover {
-            background-color: darkgreen;
+        .channel-list {
+            margin: 20px 0;
+        }
+        .channel-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            margin-left: auto;
+            font-size: 14px;
+            color: #666;
+        }
+        .success-message {
+            text-align: center;
+            padding: 40px 20px;
+            color: #28a745;
+            font-size: 18px;
+        }
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <button class="button" onclick="sendParticipation()">Участвовать</button>
+    <div class="container">
+        <!-- Шаг 1: Кнопка участия -->
+        <div id="step1">
+            <button class="button" onclick="handleParticipate()">Участвовать</button>
+        </div>
+
+        <!-- Шаг 2: Список каналов -->
+        <div id="step2" class="hidden">
+            <div class="channel-list" id="channelList"></div>
+            <button class="button" onclick="checkSubscriptions()">Проверить подписки</button>
+        </div>
+
+        <!-- Шаг 3: Успешное участие -->
+        <div id="step3" class="hidden">
+            <div class="success-message">
+                🎉 Вы успешно приняли участие в розыгрыше!
+            </div>
+        </div>
+    </div>
 
     <script>
+        let tg = Telegram.WebApp;
+        let giveawayId = null;
+
         // Инициализация WebApp
-        Telegram.WebApp.ready();
+        tg.expand();
+        tg.ready();
 
-        function sendParticipation() {
-            let tg = window.Telegram.WebApp;
+        // Получаем ID розыгрыша из параметров URL
+        const urlParams = new URLSearchParams(tg.initDataUnsafe.start_param);
+        giveawayId = urlParams.get('giveaway_id');
 
-            // Проверка инициализации WebApp
-            if (!tg) {
-                console.error("Telegram WebApp не инициализирован.");
-                alert("Ошибка: Telegram WebApp не инициализирован.");
+        async function handleParticipate() {
+            // Запрос информации о розыгрыше
+            const response = await fetch(`https://your-domain.com/get_giveaway_info?giveaway_id=${giveawayId}`, {
+                headers: {
+                    'X-Telegram-Init-Data': tg.initData
+                }
+            });
+
+            if (!response.ok) {
+                tg.showAlert('Ошибка при получении информации о розыгрыше');
                 return;
             }
 
-            // Логируем попытку отправки данных
-            console.log("Отправка данных в Telegram WebApp.");
-
-            // Отправляем данные в бот
-            tg.sendData("join");
-
-            // Закрытие мини-аппа
-            setTimeout(() => {
-                console.log("Закрытие мини-аппа...");
-                tg.close(); // Закрываем мини-апп после отправки
-            }, 500); // Задержка 500 мс
-
-            // Получаем ID пользователя
-            const userId = tg.initDataUnsafe.user.id;  // Получаем ID пользователя
-
-            // Отправка сообщения в личный чат пользователя
-            sendMessageToUser(userId);
+            const data = await response.json();
+            
+            // Показываем список каналов
+            document.getElementById('step1').classList.add('hidden');
+            document.getElementById('step2').classList.remove('hidden');
+            
+            // Генерируем список каналов
+            const channelList = document.getElementById('channelList');
+            channelList.innerHTML = data.channels.map(channel => `
+                <div class="channel-item">
+                    <span>${channel.title}</span>
+                    <a href="${channel.invite_link}" class="button" target="_blank">Подписаться</a>
+                </div>
+            `).join('');
         }
 
-        function sendMessageToUser(userId) {
-            const botToken = '7908138757:AAEDdvrzpOLT-_BKgKT1wvLVxqoeaYiPSqM';  // Замените на ваш API токен
-            const message = 'Поздравляем, вы участвуете в конкурсе!';
+        async function checkSubscriptions() {
+            tg.showPopup({
+                title: 'Проверка подписок',
+                message: 'Пожалуйста, подождите...',
+                buttons: []
+            });
 
-            // Формируем URL для запроса к Telegram API
-            const url = `https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${userId}&text=${encodeURIComponent(message)}`;
+            // Отправляем запрос на проверку подписок
+            const response = await fetch(`https://your-domain.com/check_subscriptions?giveaway_id=${giveawayId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Telegram-Init-Data': tg.initData
+                },
+                body: JSON.stringify({ user_id: tg.initDataUnsafe.user.id })
+            });
 
-            // Отправка запроса через fetch
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.ok) {
-                        console.log("Сообщение отправлено в личный чат!");
-                    } else {
-                        console.error("Ошибка отправки сообщения в личный чат:", data);
-                    }
-                })
-                .catch(error => {
-                    console.error("Ошибка при отправке запроса:", error);
-                });
+            tg.closePopup();
+
+            if (!response.ok) {
+                tg.showAlert('Ошибка при проверке подписок');
+                return;
+            }
+
+            const result = await response.json();
+            
+            if (result.all_subscribed) {
+                // Если все подписки оформлены
+                document.getElementById('step2').classList.add('hidden');
+                document.getElementById('step3').classList.remove('hidden');
+                
+                // Отправляем данные об участии
+                tg.sendData(JSON.stringify({
+                    action: 'participate',
+                    giveaway_id: giveawayId,
+                    user_id: tg.initDataUnsafe.user.id
+                }));
+                
+                // Закрываем приложение через 3 секунды
+                setTimeout(() => tg.close(), 3000);
+            } else {
+                tg.showAlert('Вы не подписаны на все необходимые каналы!');
+            }
         }
     </script>
 </body>
 </html>
-сделай предыдущую задачу отталкиваясь от этого кода, серверную часть напиши на aiogram

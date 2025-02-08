@@ -62,44 +62,6 @@ async def cmd_start(message: types.Message):
     else:
         await message.answer("Используйте ссылку с параметром розыгрыша.")
 
-# Обработчик для проверки подписок
-@dp.message(lambda message: message.web_app_data)
-async def handle_web_app_data(message: types.Message):
-    try:
-        data = json.loads(message.web_app_data.data)
-        giveaway_id = data.get("giveaway_id")
-        user_id = message.from_user.id
-
-        if giveaway_id not in giveaways_db:
-            await message.answer("Розыгрыш не найден.")
-            return
-
-        # Проверка подписок
-        channels = giveaways_db[giveaway_id]["channels"]
-        all_subscribed = True
-
-        for channel in channels:
-            chat_member = await bot.get_chat_member(chat_id=channel["chat_id"], user_id=user_id)
-            if chat_member.status not in ["member", "administrator", "creator"]:
-                all_subscribed = False
-                break
-
-        if all_subscribed:
-            giveaways_db[giveaway_id]["participants"].add(user_id)
-            await message.answer("🎉 Вы успешно участвуете в розыгрыше!")
-        else:
-            await message.answer("Подпишитесь на все каналы, чтобы участвовать.")
-    except Exception as e:
-        logging.error(f"Error handling web app data: {e}")
-        await message.answer("Произошла ошибка. Попробуйте позже.")
-
-# Запуск бота через вебхуки
-async def on_startup(bot: Bot):
-    await bot.set_webhook(WEBHOOK_URL)
-
-async def on_shutdown(bot: Bot):
-    await bot.delete_webhook()
-
 
 @dp.message(F.text == "Создать розыгрыш")
 async def process_create_giveaway(message: Message, state: FSMContext):
@@ -441,21 +403,41 @@ async def process_select_winner(message: Message, state: FSMContext):
     await message.answer("Розыгрыш успешно завершен! Уведомления отправлены участникам.")
     await state.clear()
 
+# Добавьте в main.py
+
+@dp.message(Command('get_giveaway_info'))
+async def get_giveaway_info(message: Message):
+    giveaway_id = message.text.split('=')[1]
+    giveaway = await get_giveaway_details(giveaway_id)
+    
+    channels_info = [{
+        'title': channel.title,
+        'invite_link': channel.invite_link
+    } for channel in giveaway.channels]
+    
+    await message.answer(json.dumps({
+        'channels': channels_info
+    }))
+
+@dp.message(Command('check_subscriptions'))
+async def check_subscriptions(message: Message):
+    data = json.loads(message.text)
+    user_id = data['user_id']
+    giveaway_id = data['giveaway_id']
+    
+    giveaway = await get_giveaway_details(giveaway_id)
+    channel_ids = [channel.tg_id for channel in giveaway.channels]
+    
+    is_subscribed = await check_user_subscription(user_id, channel_ids, bot)
+    
+    await message.answer(json.dumps({
+        'all_subscribed': is_subscribed
+    }))
+
 async def main():
     await async_main()
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
     asyncio.run(main())
-    # Настройка веб-сервера
-    app = web.Application()
-    webhook_requests_handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
-    webhook_requests_handler.register(app, path="/webhook")
-
-    # Запуск приложения
-    setup_application(app, dp, bot=bot)
-    app.on_startup.append(on_startup)
-    app.on_shutdown.append(on_shutdown)
-
-    web.run_app(app, host="0.0.0.0", port=8080)
     
