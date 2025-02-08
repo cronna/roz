@@ -26,47 +26,80 @@ class GiveawayStates(StatesGroup):
 
 from aiogram.types import WebAppInfo
 
-@dp.message(Command('start'))
-async def cmd_start(message: Message):
-    # Парсим параметр startapp из ссылки
-    if message.web_app_data:
-        # Если пользователь перешел по ссылке с startapp
-        try:
-            data = json.loads(message.web_app_data.data)
-            giveaway_id = data.get('giveaway_id')
-            if giveaway_id:
-                await handle_web_app_data(message)  # Обрабатываем данные из WebApp
-                return
-        except Exception as e:
-            logging.error(f"Ошибка обработки web_app_data: {e}")
+# Добавим новый обработчик для команды start с параметром giveaway
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import CommandStart
+from aiogram.types import WebAppInfo
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
+import logging
+import hashlib
+import hmac
+import json
 
-    # Если это обычная команда /start
-    await add_user(message.from_user)
-    await message.answer("Добро пожаловать! Выберите действие:", reply_markup=main_menu())
+# Конфигурация
+API_TOKEN = API_TOKEN
+WEBAPP_URL = "https://cronna.github.io/roz_html/giveaway.html"  # URL вашего мини-приложения
 
-@dp.message(F.text.startswith('/start giveaway_'))
-async def handle_start_with_giveaway(message: Message):
-    # Обработка ссылки вида /start giveaway_5
+# Инициализация бота и диспетчера
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher()
+
+# Команда /start с передачей параметра розыгрыша
+@dp.message(CommandStart())
+async def cmd_start(message: types.Message):
+    args = message.text.split()
+    if len(args) > 1 and args[1].startswith("giveaway_"):
+        giveaway_id = args[1].split("=")[1]
+        await message.answer(
+            "Нажмите кнопку, чтобы участвовать в розыгрыше:",
+            reply_markup=InlineKeyboardBuilder().button(
+                text="Участвовать",
+                web_app=WebAppInfo(url=f"{WEBAPP_URL}?giveaway_id={giveaway_id}")
+            ).as_markup()
+        )
+    else:
+        await message.answer("Используйте ссылку с параметром розыгрыша.")
+
+# Обработчик для проверки подписок
+@dp.message(lambda message: message.web_app_data)
+async def handle_web_app_data(message: types.Message):
     try:
-        giveaway_id = int(message.text.split('_')[1])
-        giveaway = await get_giveaway_details(giveaway_id)
-        if not giveaway:
+        data = json.loads(message.web_app_data.data)
+        giveaway_id = data.get("giveaway_id")
+        user_id = message.from_user.id
+
+        if giveaway_id not in giveaways_db:
             await message.answer("Розыгрыш не найден.")
             return
 
-        # Отправляем пользователя в мини-приложение
-        await message.answer(
-            "🎉 Вы перешли в мини-приложение для участия в розыгрыше!",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(
-                    text="Открыть розыгрыш",
-                    web_app=WebAppInfo(url=giveaway.deep_link)
-                )
-            ]])
-        )
+        # Проверка подписок
+        channels = giveaways_db[giveaway_id]["channels"]
+        all_subscribed = True
+
+        for channel in channels:
+            chat_member = await bot.get_chat_member(chat_id=channel["chat_id"], user_id=user_id)
+            if chat_member.status not in ["member", "administrator", "creator"]:
+                all_subscribed = False
+                break
+
+        if all_subscribed:
+            giveaways_db[giveaway_id]["participants"].add(user_id)
+            await message.answer("🎉 Вы успешно участвуете в розыгрыше!")
+        else:
+            await message.answer("Подпишитесь на все каналы, чтобы участвовать.")
     except Exception as e:
-        logging.error(f"Ошибка обработки ссылки: {e}")
+        logging.error(f"Error handling web app data: {e}")
         await message.answer("Произошла ошибка. Попробуйте позже.")
+
+# Запуск бота через вебхуки
+async def on_startup(bot: Bot):
+    await bot.set_webhook(WEBHOOK_URL)
+
+async def on_shutdown(bot: Bot):
+    await bot.delete_webhook()
+
 
 @dp.message(F.text == "Создать розыгрыш")
 async def process_create_giveaway(message: Message, state: FSMContext):
@@ -414,67 +447,15 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+    # Настройка веб-сервера
+    app = web.Application()
+    webhook_requests_handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
+    webhook_requests_handler.register(app, path="/webhook")
 
+    # Запуск приложения
+    setup_application(app, dp, bot=bot)
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
 
-
-from flask import Flask, jsonify, request
-from models import async_session, Giveaway, Channel
-import asyncio
-
-app = Flask(__name__)
-
-@app.route('/api/giveaway/<int:giveaway_id>', methods=['GET'])
-async def get_giveaway(giveaway_id):
-    async with async_session() as session:
-        giveaway = await session.get(Giveaway, giveaway_id, options=[selectinload(Giveaway.channels)])
-        if not giveaway:
-            return jsonify({'status': 'error', 'message': 'Розыгрыш не найден'})
-        
-        return jsonify({
-            'status': 'success',
-            'data': {
-                'id': giveaway.id,
-                'name': giveaway.name,
-                'description': giveaway.description,
-                'is_active': giveaway.is_active,
-                'max_participants': giveaway.max_participants,
-                'participants': giveaway.participants,
-                'channels': [{
-                    'id': channel.tg_id,
-                    'title': channel.title,
-                    'invite_link': channel.invite_link
-                } for channel in giveaway.channels],
-                'winner_id': giveaway.winner_id
-            }
-        })
-
-@app.route('/api/participate', methods=['POST'])
-async def participate():
-    data = request.json
-    giveaway_id = data['giveaway_id']
-    user_id = data['user_id']
+    web.run_app(app, host="0.0.0.0", port=8080)
     
-    async with async_session() as session:
-        giveaway = await session.get(Giveaway, giveaway_id)
-        if not giveaway or not giveaway.is_active:
-            return jsonify({'status': 'error', 'message': 'Розыгрыш завершен'})
-        
-        if giveaway.participants >= giveaway.max_participants:
-            return jsonify({'status': 'error', 'message': 'Лимит участников достигнут'})
-        
-        existing = await session.scalar(
-            select(GiveawayParticipant).where(
-                GiveawayParticipant.giveaway_id == giveaway_id,
-                GiveawayParticipant.user_id == user_id
-            )
-        )
-        
-        if existing:
-            return jsonify({'status': 'error', 'message': 'Вы уже участвуете'})
-        
-        session.add(GiveawayParticipant(giveaway_id=giveaway_id, user_id=user_id))
-        await session.commit()
-        return jsonify({'status': 'success'})
-
-if __name__ == '__main__':
-    app.run(port=5000)
