@@ -405,6 +405,48 @@ async def process_select_winner(message: Message, state: FSMContext):
 
 # Добавьте в main.py
 
+@dp.message(F.web_app_data)
+async def handle_web_app_data(message: Message):
+    try:
+        data = json.loads(message.web_app_data.data)
+        action = data.get('action')
+        user_id = message.from_user.id
+        
+        if action == 'get_giveaway_info':
+            giveaway_id = data.get('giveaway_id')
+            giveaway = await get_giveaway_details(giveaway_id)
+            
+            if not giveaway:
+                return await message.answer(json.dumps({'error': 'Розыгрыш не найден'}))
+            
+            channels_info = [{
+                'title': channel.title,
+                'invite_link': channel.invite_link
+            } for channel in giveaway.channels]
+            
+            return await message.answer(json.dumps({'channels': channels_info}))
+        
+        elif action == 'check_subscriptions':
+            giveaway_id = data.get('giveaway_id')
+            giveaway = await get_giveaway_details(giveaway_id)
+            channel_ids = [channel.tg_id for channel in giveaway.channels]
+            
+            is_subscribed = await check_user_subscription(user_id, channel_ids, bot)
+            return await message.answer(json.dumps({'all_subscribed': is_subscribed}))
+        
+        elif action == 'participate':
+            giveaway_id = data.get('giveaway_id')
+            success = await join_giveaway(giveaway_id, user_id)
+            
+            if success:
+                return await message.answer(json.dumps({'status': 'success'}))
+            else:
+                return await message.answer(json.dumps({'error': 'Не удалось присоединиться'}))
+            
+    except Exception as e:
+        logging.error(f"WebApp error: {e}")
+        return await message.answer(json.dumps({'error': 'Internal server error'}))
+
 @dp.message(Command('get_giveaway_info'))
 async def get_giveaway_info(message: Message):
     giveaway_id = message.text.split('=')[1]

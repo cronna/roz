@@ -88,37 +88,52 @@
         tg.expand();
         tg.ready();
 
-        // Получаем ID розыгрыша из параметров URL
-        const urlParams = new URLSearchParams(tg.initDataUnsafe.start_param);
-        giveawayId = urlParams.get('giveaway_id');
+        // Получаем ID розыгрыша из параметров
+        function getGiveawayId() {
+            try {
+                const startParam = tg.initDataUnsafe.start_param;
+                return startParam.split('_')[1]; // giveaway_123 -> 123
+            } catch (e) {
+                return null;
+            }
+        }
 
         async function handleParticipate() {
-            // Запрос информации о розыгрыше
-            const response = await fetch(`https://your-domain.com/get_giveaway_info?giveaway_id=${giveawayId}`, {
-                headers: {
-                    'X-Telegram-Init-Data': tg.initData
-                }
-            });
-
-            if (!response.ok) {
-                tg.showAlert('Ошибка при получении информации о розыгрыше');
+            giveawayId = getGiveawayId();
+            if (!giveawayId) {
+                tg.showAlert('Ошибка: не найден розыгрыш');
                 return;
             }
 
-            const data = await response.json();
-            
-            // Показываем список каналов
-            document.getElementById('step1').classList.add('hidden');
-            document.getElementById('step2').classList.remove('hidden');
-            
-            // Генерируем список каналов
-            const channelList = document.getElementById('channelList');
-            channelList.innerHTML = data.channels.map(channel => `
-                <div class="channel-item">
-                    <span>${channel.title}</span>
-                    <a href="${channel.invite_link}" class="button" target="_blank">Подписаться</a>
-                </div>
-            `).join('');
+            try {
+                const response = await tg.sendData({
+                    action: 'get_giveaway_info',
+                    giveaway_id: giveawayId
+                });
+                
+                const data = JSON.parse(response);
+                
+                if (data.error) {
+                    tg.showAlert(data.error);
+                    return;
+                }
+
+                // Показываем список каналов
+                document.getElementById('step1').classList.add('hidden');
+                document.getElementById('step2').classList.remove('hidden');
+                
+                // Генерируем список каналов
+                const channelList = document.getElementById('channelList');
+                channelList.innerHTML = data.channels.map(channel => `
+                    <div class="channel-item">
+                        <span>${channel.title}</span>
+                        <a href="${channel.invite_link}" class="button" target="_blank">Подписаться</a>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                tg.showAlert('Ошибка подключения: ' + error.message);
+            }
         }
 
         async function checkSubscriptions() {
@@ -128,41 +143,35 @@
                 buttons: []
             });
 
-            // Отправляем запрос на проверку подписок
-            const response = await fetch(`https://your-domain.com/check_subscriptions?giveaway_id=${giveawayId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Telegram-Init-Data': tg.initData
-                },
-                body: JSON.stringify({ user_id: tg.initDataUnsafe.user.id })
-            });
-
-            tg.closePopup();
-
-            if (!response.ok) {
-                tg.showAlert('Ошибка при проверке подписок');
-                return;
-            }
-
-            const result = await response.json();
-            
-            if (result.all_subscribed) {
-                // Если все подписки оформлены
-                document.getElementById('step2').classList.add('hidden');
-                document.getElementById('step3').classList.remove('hidden');
-                
-                // Отправляем данные об участии
-                tg.sendData(JSON.stringify({
-                    action: 'participate',
+            try {
+                const result = await tg.sendData({
+                    action: 'check_subscriptions',
                     giveaway_id: giveawayId,
                     user_id: tg.initDataUnsafe.user.id
-                }));
+                });
+
+                const response = JSON.parse(result);
                 
-                // Закрываем приложение через 3 секунды
-                setTimeout(() => tg.close(), 3000);
-            } else {
-                tg.showAlert('Вы не подписаны на все необходимые каналы!');
+                if (response.all_subscribed) {
+                    // Успешная проверка
+                    document.getElementById('step2').classList.add('hidden');
+                    document.getElementById('step3').classList.remove('hidden');
+                    
+                    // Финализация участия
+                    const finalResult = await tg.sendData({
+                        action: 'participate',
+                        giveaway_id: giveawayId,
+                        user_id: tg.initDataUnsafe.user.id
+                    });
+                    
+                    setTimeout(() => tg.close(), 3000);
+                } else {
+                    tg.showAlert('Вы не подписаны на все каналы!');
+                }
+            } catch (error) {
+                tg.showAlert('Ошибка проверки: ' + error.message);
+            } finally {
+                tg.closePopup();
             }
         }
     </script>
