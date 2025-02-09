@@ -81,22 +81,21 @@
     <script>
         Telegram.WebApp.ready();
         
+        const tg = window.Telegram.WebApp;
+        const giveawayId = "{{ giveaway.id }}";
+        const userId = tg.initDataUnsafe.user?.id;
+    
         function handleParticipation() {
-             if (!giveaway.is_active)
+            if (!isActive) {
                 alert('Этот розыгрыш уже завершен');
                 return;
-             endif
-        }   
-
-            const tg = window.Telegram.WebApp;
-            const giveawayId = "{{ giveaway.id }}";
-            const userId = tg.initDataUnsafe.user?.id;
-
+            }
+    
             if (!userId || !giveawayId) {
                 alert('Ошибка: Не удалось получить данные участника');
                 return;
             }
-
+    
             fetch('/participate', {
                 method: 'POST',
                 headers: {
@@ -122,6 +121,7 @@
                 console.error('Ошибка:', error);
                 alert(error.message);
             });
+        }
     </script>
 </body>
 </html>

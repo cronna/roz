@@ -6,7 +6,7 @@ from models import Giveaway
 from requests import get_giveaway_details, join_giveaway
 
 app = Flask(__name__)
-app.config['BOT_TOKEN'] = os.environ.get('BOT_TOKEN', '')
+app.config['BOT_TOKEN'] = os.environ.get('BOT_TOKEN', '7790467084:AAGYK-Gm60ailV6B0q5K4bOgNaQ01oOu0L0')
 
 def run_async(coro):
     loop = asyncio.new_event_loop()
