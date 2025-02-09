@@ -8,16 +8,28 @@
     <style>
         body {
             margin: 0;
-            padding: 0;
+            padding: 20px;
             height: 100vh;
             background-image: url('{{ url_for("static", filename="base.jpg") }}');
             background-size: cover;
             background-position: center;
             font-family: Arial, sans-serif;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            text-align: center;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        .content {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 20px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+        }
+        h1 {
+            margin-top: 0;
+            color: #fff;
         }
         .button {
             padding: 15px 90px;
@@ -28,21 +40,55 @@
             border-radius: 12px;
             cursor: pointer;
             transition: background-color 0.3s;
+            margin-top: 20px;
         }
         .button:hover {
             background-color: #006400;
         }
+        .info-block {
+            margin-bottom: 20px;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #197c65;
+        }
     </style>
 </head>
 <body>
-    <button class="button" onclick="handleParticipation()">Участвовать</button>
+    <div class="content">
+        <h1>{{ giveaway.name }}</h1>
+        
+        <div class="info-block">
+            <div class="info-label">Описание:</div>
+            <div>{{ giveaway.description }}</div>
+        </div>
+        
+        <div class="info-block">
+            <div class="info-label">Участников:</div>
+            <div>{{ giveaway.participants }} / {{ giveaway.max_participants }}</div>
+        </div>
+        
+        <div class="info-block">
+            <div class="info-label">Статус:</div>
+            <div>{{ 'Активен' if giveaway.is_active else 'Завершен' }}</div>
+        </div>
+        
+        <button class="button" onclick="handleParticipation()">
+            {{ 'Участвовать' if giveaway.is_active else 'Розыгрыш завершен' }}
+        </button>
+    </div>
 
     <script>
         Telegram.WebApp.ready();
         
         function handleParticipation() {
+            {if (!giveaway.is_active) 
+                alert('Этот розыгрыш уже завершен');
+                return;
+             endif 
+
             const tg = window.Telegram.WebApp;
-            const giveawayId = "{{ giveaway_id }}";
+            const giveawayId = "{{ giveaway.id }}";
             const userId = tg.initDataUnsafe.user?.id;
 
             if (!userId || !giveawayId) {
@@ -75,6 +121,7 @@
                 console.error('Ошибка:', error);
                 alert(error.message);
             });
+        }
         }
     </script>
 </body>
