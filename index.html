@@ -42,14 +42,15 @@
         Telegram.WebApp.ready();
 
         // Функция для извлечения параметров из URL
-        function getParameterByName(name, url = window.location.href) {
-            name = name.replace(/[\[\]]/g, '\\$&');
-            let regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
-                results = regex.exec(url);
-            if (!results) return null;
-            if (!results[2]) return '';
-            return decodeURIComponent(results[2].replace(/\+/g, ' '));
+        function getStartParam() {
+            const initData = Telegram.WebApp.initData;
+            if (!initData) return null;
+
+            // Парсим initData
+            const params = new URLSearchParams(initData);
+            return params.get('startapp');
         }
+
 
         function sendParticipation() {
             let tg = window.Telegram.WebApp;
