@@ -80,23 +80,28 @@
 
     <script>
         Telegram.WebApp.ready();
-        
+
         const tg = window.Telegram.WebApp;
         const giveawayId = "{{ giveaway.id }}";
         const userId = tg.initDataUnsafe.user?.id;
-    
+        const isActive = "{{ giveaway.is_active }}" === "True";
+
+        console.log('TG Data:', tg.initDataUnsafe);
+        console.log('User ID:', userId);
+        console.log('Giveaway ID:', giveawayId);
+
         function handleParticipation() {
             if (!isActive) {
                 alert('Этот розыгрыш уже завершен');
                 return;
             }
-    
+
             if (!userId || !giveawayId) {
                 alert('Ошибка: Не удалось получить данные участника');
                 return;
             }
-    
-            fetch('/participate', {
+
+            fetch(window.location.origin + '/participate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -112,6 +117,8 @@
             })
             .then(data => {
                 if (data.status === 'success') {
+                    document.querySelector('.button').innerText = 'Вы уже участвуете';
+                    document.querySelector('.button').disabled = true;
                     setTimeout(() => tg.close(), 300);
                 } else {
                     throw new Error(data.message || 'Неизвестная ошибка');

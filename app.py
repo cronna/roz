@@ -39,8 +39,8 @@ def index():
         'channels': [{'title': channel.title} for channel in getattr(giveaway, 'channels', [])]
     }
     
+    giveaway_data['is_active'] = Markup("true" if giveaway.is_active else "false")
     return render_template('index.html', giveaway=giveaway_data)
-
 @app.route('/participate', methods=['POST'])
 def handle_participation():
     data = request.json or {}
