@@ -154,7 +154,7 @@ async def finish_add_channels(callback: CallbackQuery, state: FSMContext):
     giveaway_id = data['giveaway_id']
     
     # Генерируем deep link
-    deep_link = f"https://t.me/@givegive2323bot?start=giveaway_{giveaway_id}"
+    deep_link = f"https://t.me/givegive2323bot/givegive2323bot?start=giveaway_{giveaway_id}"
     
     # Сохраняем ссылку в базе данных
     await set_give_link(giveaway_id, deep_link)
@@ -167,45 +167,18 @@ async def finish_add_channels(callback: CallbackQuery, state: FSMContext):
     await state.clear()
 
 
+from aiogram import types
+from aiogram.filters import Filter
+import json
+import logging
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 @dp.message(F.web_app_data)
-async def handle_web_app_data(message: Message):
-    try:
-        data = json.loads(message.web_app_data.data)
-        giveaway_id = data.get('giveaway_id')
-        user_id = message.from_user.id
-        
-        giveaway = await get_giveaway_details(giveaway_id)
-        if not giveaway or not giveaway.is_active:
-            await message.answer("🚫 Розыгрыш завершен или не найден")
-            return
-        
-        # Проверка подписок
-        channel_ids = [channel.tg_id for channel in giveaway.channels]
-        if channel_ids:
-            is_subscribed = await check_user_subscription(user_id, channel_ids, bot)
-            if not is_subscribed:
-                await message.answer(
-                    "📢 Для участия необходимо подписаться на каналы:",
-                    reply_markup=await channels_subscription_keyboard(giveaway_id)
-                )
-                return
-        
-        # Добавление участника
-        success = await join_giveaway(giveaway_id, user_id)
-        if success:
-            await message.answer(
-                f"🎉 Вы участвуете в розыгрыше!\n\n"
-                f"Название: {giveaway.name}\n"
-                f"Описание: {giveaway.description}\n"
-                f"Участников: {giveaway.participants}/{giveaway.max_participants}",
-                reply_markup=giveaway_details_keyboard(giveaway_id)
-            )
-        else:
-            await message.answer("❌ Не удалось присоединиться. Лимит участников достигнут.")
-            
-    except Exception as e:
-        logging.error(f"Web app error: {e}")
-        await message.answer("⚠️ Произошла ошибка при обработке запроса")
+async def handle_web_app_data(message: types.Message):
+    message.answer('jgjg')
 
 @dp.message(F.text == "Мои розыгрыши")
 async def show_my_giveaways(message: Message):
