@@ -63,7 +63,7 @@
 
             // Получаем ID розыгрыша из параметра ссылки
             const startParam = getParameterByName('startapp');
-            const giveawayId = 7;
+            const giveawayId = startParam ? startParam.split('_')[1] : null;
 
             if (!giveawayId) {
                 console.error("ID розыгрыша не найден в ссылке.");
