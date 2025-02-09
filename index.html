@@ -44,7 +44,7 @@
     // Функция извлечения параметра start_param из Telegram.WebApp.initDataUnsafe или из URL
     function getStartParam() {
       // Если доступно значение initDataUnsafe.start_param, используем его
-      if (Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.start_param) {
+      if (Telegram?.WebApp?.initDataUnsafe?.start_param) {
         return Telegram.WebApp.initDataUnsafe.start_param;
       }
       // Иначе пытаемся извлечь параметр из window.location.search
@@ -52,8 +52,8 @@
       return params.get('start_param') || params.get('startapp');
     }
 
-    function sendParticipation() {
-      let tg = window.Telegram.WebApp;
+    async function sendParticipation() {
+      const tg = window.Telegram.WebApp;
 
       // Проверка инициализации WebApp
       if (!tg) {
@@ -64,47 +64,27 @@
 
       // Получаем ID розыгрыша из параметра ссылки
       const startParam = getStartParam();
-      const giveawayId = startParam ? startParam.split('_')[1] : null;
+      const giveawayId = startParam?.split('_')[1];
 
       if (!giveawayId) {
-        console.error("ID розыгрыша не найден в ссылке.");
+        console.error("ID розыгрыша не найден.");
         alert("Ошибка: ID розыгрыша не найден в ссылке.");
         return;
       }
 
-      // Получаем ID пользователя
-      const userId = tg.initDataUnsafe.user.id;
+      // Формируем данные для отправки
+      const data = {
+        giveaway_id: giveawayId, // Ключ должен совпадать с тем, что ожидает бот
+      };
 
-      // Логируем данные
-      console.log("User ID:", userId);
-      console.log("Giveaway ID:", giveawayId);
-
-      // Отправляем данные в бот
-      const botToken = '7790467084:AAGYK-Gm60ailV6B0q5K4bOgNaQ01oOu0L0';  // Замените на ваш API токен
-      const message = `start_${giveawayId}`;
-
-      // Формируем URL для запроса к Telegram API
-      const url = `https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${userId}&text=${encodeURIComponent(message)}`;
-
-      // Отправка запроса через fetch
-      fetch(url)
-        .then(response => response.json())
-        .then(data => {
-          if (data.ok) {
-            console.log("Сообщение отправлено в личный чат!");
-          } else {
-            console.error("Ошибка отправки сообщения в личный чат:", data);
-          }
-        })
-        .catch(error => {
-          console.error("Ошибка при отправке запроса:", error);
-        });
+      // Отправляем данные через WebApp
+      tg.sendData(JSON.stringify(data));
 
       // Закрытие мини-аппа
       setTimeout(() => {
         console.log("Закрытие мини-аппа...");
         tg.close(); // Закрываем мини-апп после отправки
-      }, 500); // Задержка 500 мс
+      }, 1000); // Увеличиваем задержку до 1000 мс для надежности
     }
   </script>
 </body>
