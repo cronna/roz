@@ -4,129 +4,122 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Конкурс</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="[Telegram Web App](https://telegram.org/js/telegram-web-app.js)"></script>
     <style>
         body {
             margin: 0;
             padding: 20px;
             height: 100vh;
-            background-image: url('{{ url_for("static", filename="base.jpg") }}');
-            background-size: cover;
-            background-position: center;
+            background: url('{{ url_for("static", filename="base.jpg") }}') no-repeat center/cover;
             font-family: Arial, sans-serif;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
             align-items: center;
             color: white;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
         }
         .content {
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.7);
             padding: 20px;
             border-radius: 15px;
             max-width: 500px;
-            width: 90%;
+            text-align: center;
         }
         h1 {
-            margin-top: 0;
-            color: #fff;
-        }
-        .button {
-            padding: 15px 90px;
-            background-color: #197c65;
-            color: white;
-            font-size: 24px;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            margin-top: 20px;
-        }
-        .button:hover {
-            background-color: #006400;
+            margin: 0 0 15px;
+            font-size: 26px;
         }
         .info-block {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
+            font-size: 18px;
         }
         .info-label {
             font-weight: bold;
-            color: #197c65;
+            color: #00b894;
+        }
+        .button {
+            padding: 12px 30px;
+            background-color: #00b894;
+            color: white;
+            font-size: 20px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+            width: 100%;
+            margin-top: 15px;
+        }
+        .button:hover {
+            background-color: #008c74;
+        }
+        .button:disabled {
+            background-color: gray;
+            cursor: not-allowed;
         }
     </style>
 </head>
 <body>
     <div class="content">
         <h1>{{ giveaway.name }}</h1>
-        
         <div class="info-block">
-            <div class="info-label">Описание:</div>
-            <div>{{ giveaway.description }}</div>
+            <span class="info-label">Описание:</span> {{ giveaway.description }}
         </div>
-        
         <div class="info-block">
-            <div class="info-label">Участников:</div>
-            <div>{{ giveaway.participants }} / {{ giveaway.max_participants }}</div>
+            <span class="info-label">Участников:</span> {{ giveaway.participants }} / {{ giveaway.max_participants }}
         </div>
-        
         <div class="info-block">
-            <div class="info-label">Статус:</div>
-            <div>{{ 'Активен' if giveaway.is_active else 'Завершен' }}</div>
+            <span class="info-label">Статус:</span> {{ "Активен" if giveaway.is_active else "Завершен" }}
         </div>
-        
-        <button class="button" onclick="handleParticipation()">
+        <button class="button" id="participate-button" onclick="handleParticipation()" {% if not giveaway.is_active %}disabled{% endif %}>
             {{ 'Участвовать' if giveaway.is_active else 'Розыгрыш завершен' }}
         </button>
     </div>
-
     <script>
-        Telegram.WebApp.ready();
+        if (window.Telegram && Telegram.WebApp) {
+            Telegram.WebApp.ready();
+        } else {
+            console.error("Ошибка: Telegram WebApp недоступен.");
+        }
 
         const tg = window.Telegram.WebApp;
         const giveawayId = "{{ giveaway.id }}";
-        const userId = tg.initDataUnsafe.user?.id;
-        const isActive = "{{ giveaway.is_active }}" === "True";
+        const userId = tg?.initDataUnsafe?.user?.id;
+        const isActive = "{{ giveaway.is_active | tojson }}";
+        const button = document.getElementById("participate-button");
 
-        console.log('TG Data:', tg.initDataUnsafe);
-        console.log('User ID:', userId);
-        console.log('Giveaway ID:', giveawayId);
+        if (!isActive) {
+            button.disabled = true;
+        }
 
         function handleParticipation() {
             if (!isActive) {
-                alert('Этот розыгрыш уже завершен');
+                alert("Этот розыгрыш уже завершен");
                 return;
             }
 
             if (!userId || !giveawayId) {
-                alert('Ошибка: Не удалось получить данные участника');
+                alert("Ошибка: Не удалось получить данные участника");
                 return;
             }
 
-            fetch(window.location.origin + '/participate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    user_id: userId,
-                    giveaway_id: giveawayId
-                })
+            fetch("/participate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: userId, giveaway_id: giveawayId })
             })
-            .then(response => {
-                if (!response.ok) throw new Error('Ошибка сети');
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                if (data.status === 'success') {
-                    document.querySelector('.button').innerText = 'Вы уже участвуете';
-                    document.querySelector('.button').disabled = true;
+                if (data.status === "success") {
+                    button.innerText = "Вы уже участвуете";
+                    button.disabled = true;
                     setTimeout(() => tg.close(), 300);
                 } else {
-                    throw new Error(data.message || 'Неизвестная ошибка');
+                    throw new Error(data.message || "Неизвестная ошибка");
                 }
             })
             .catch(error => {
-                console.error('Ошибка:', error);
-                alert(error.message);
+                console.error("Ошибка:", error);
+                alert(error.message || "Ошибка подключения");
             });
         }
     </script>
