@@ -32,7 +32,7 @@ class GiveawayStates(StatesGroup):
 
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
-    pass
+    await message.answer("Добро пожаловать! Выберите действие:", reply_markup=main_menu())
 
 
 @dp.message(F.text == "Создать розыгрыш")
