@@ -6,7 +6,7 @@ from models import Giveaway
 from requests import get_giveaway_details, join_giveaway
 
 app = Flask(__name__)
-app.config['BOT_TOKEN'] = os.environ.get('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
+app.config['BOT_TOKEN'] = os.environ.get('BOT_TOKEN', '7790467084:AAGYK-Gm60ailV6B0q5K4bOgNaQ01oOu0L0')
 
 def run_async(coro):
     loop = asyncio.new_event_loop()
@@ -24,12 +24,24 @@ def index():
     if not giveaway_id.isdigit():
         return render_template('error.html', message='Некорректный ID розыгрыша')
     
-    giveaway = run_async(get_giveaway_details(giveaway_id))
+    # Получаем данные о розыгрыше
+    giveaway = run_async(get_giveaway_details(int(giveaway_id)))
     
     if not giveaway:
         return render_template('error.html', message='Розыгрыш не найден')
     
-    return render_template('index.html', giveaway=giveaway)
+    # Преобразуем объект Giveaway в словарь для передачи в шаблон
+    giveaway_data = {
+        'id': giveaway.id,
+        'name': giveaway.name,
+        'description': giveaway.description,
+        'participants': giveaway.participants,
+        'max_participants': giveaway.max_participants,
+        'is_active': giveaway.is_active,
+        'channels': [{'title': channel.title} for channel in giveaway.channels]
+    }
+    
+    return render_template('index.html', giveaway=giveaway_data)
 
 @app.route('/participate', methods=['POST'])
 def handle_participation():
@@ -73,4 +85,5 @@ def handle_participation():
             'message': f'Ошибка отправки: {str(e)}'
         }), 500
 
-    
+if __name__ == '__main__':
+    app.run(debug=True)

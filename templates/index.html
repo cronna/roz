@@ -82,10 +82,11 @@
         Telegram.WebApp.ready();
         
         function handleParticipation() {
-            {if (!giveaway.is_active) 
+             if (!giveaway.is_active)
                 alert('Этот розыгрыш уже завершен');
                 return;
-             endif 
+             endif
+        }   
 
             const tg = window.Telegram.WebApp;
             const giveawayId = "{{ giveaway.id }}";
@@ -121,8 +122,6 @@
                 console.error('Ошибка:', error);
                 alert(error.message);
             });
-        }
-        }
     </script>
 </body>
 </html>
