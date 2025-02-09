@@ -147,24 +147,25 @@ async def process_add_channels(message: Message, state: FSMContext):
             reply_markup=builder.as_markup()
         )
 
+# В обработчик создания розыгрыша после успешного создания
 @dp.callback_query(F.data == "finish_add_channels")
 async def finish_add_channels(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     giveaway_id = data['giveaway_id']
     
-    deep_link = await generate_giveaway_link(giveaway_id)
+    # Генерируем deep link
+    deep_link = f"https://t.me/@givegive2323bot?start=giveaway_{giveaway_id}"
     
-    async with async_session() as session:
-        giveaway = await session.get(Giveaway, giveaway_id)
-        giveaway.deep_link = deep_link
-        await session.commit()
+    # Сохраняем ссылку в базе данных
+    await set_give_link(giveaway_id, deep_link)
     
     await callback.message.answer(
-        f"✅ Розыгрыш создан!\n\n"
-        f"🔗 Ссылка для участия:\n{deep_link}",
+        f"🎉 Розыгрыш создан!\n\n"
+        f"Ссылка для участия: {deep_link}",
         reply_markup=main_menu()
     )
     await state.clear()
+
 
 @dp.message(F.web_app_data)
 async def handle_web_app_data(message: Message):

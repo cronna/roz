@@ -43,11 +43,13 @@
 
         // Функция для извлечения параметров из URL
         function getStartParam() {
-            const initData = Telegram.WebApp.initData;
-            if (!initData) return null;
-
-            // Парсим initData
-            const params = new URLSearchParams(initData);
+            // Если доступно невалидированное значение initDataUnsafe, используем его
+            if (Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.startapp) {
+                return Telegram.WebApp.initDataUnsafe.startapp;
+            }
+            
+            // Иначе пытаемся извлечь параметр из window.location.search
+            const params = new URLSearchParams(document.location.search);
             return params.get('startapp');
         }
 
