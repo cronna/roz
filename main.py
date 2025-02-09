@@ -1,16 +1,18 @@
-import logging, asyncio
+import logging
+import asyncio
+import time
 from aiogram.types import WebAppInfo
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.utils.web_app import check_webapp_signature, parse_init_data
 from models import async_main
 from requests import *
 from keyboards import *
 import json
-
 logging.basicConfig(level=logging.INFO)
 
 API_TOKEN = '7790467084:AAGYK-Gm60ailV6B0q5K4bOgNaQ01oOu0L0'
@@ -23,30 +25,22 @@ class GiveawayStates(StatesGroup):
     max_participants = State()
     add_channels = State()
     select_winner = State() 
-
-from aiogram.types import WebAppInfo
-
-# Добавим новый обработчик для команды start с параметром giveaway
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import CommandStart
-from aiogram.types import WebAppInfo
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
-from aiohttp import web
-import logging
-import hashlib
-import hmac
-import json
-
-# Конфигурация
-API_TOKEN = API_TOKEN
-WEBAPP_URL = "https://cronna.github.io/roz_html/giveaway.html"  # URL вашего мини-приложения
-
 # Инициализация бота и диспетчера
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
 # Команда /start с передачей параметра розыгрыша
+def validate_init_data(init_data: str) -> bool:
+    try:
+        if not check_webapp_signature(API_TOKEN, init_data):
+            return False
+        data = parse_init_data(init_data)
+        if (time.time() - int(data['auth_date'])) > 3600:
+            return False
+        return True
+    except:
+        return False
+
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
     args = message.text.split()
@@ -56,11 +50,57 @@ async def cmd_start(message: types.Message):
             "Нажмите кнопку, чтобы участвовать в розыгрыше:",
             reply_markup=InlineKeyboardBuilder().button(
                 text="Участвовать",
-                web_app=WebAppInfo(url=f"{WEBAPP_URL}?giveaway_id={giveaway_id}")
+                web_app=WebAppInfo(url=f"https:///index.html?giveaway_id={giveaway_id}")
             ).as_markup()
         )
     else:
         await message.answer("Используйте ссылку с параметром розыгрыша.")
+
+@dp.message(F.web_app_data)
+async def handle_web_app_data(message: Message):
+    # Валидация данных
+    if not validate_init_data(message.web_app_data.init_data):
+        return await message.answer(json.dumps({'error': 'Invalid authorization'}))
+    
+    try:
+        data = json.loads(message.web_app_data.data)
+        action = data.get('action')
+        user_id = message.from_user.id
+        
+        if action == 'get_giveaway_info':
+            giveaway_id = data.get('giveaway_id')
+            giveaway = await get_giveaway_details(giveaway_id)
+            
+            if not giveaway:
+                return await message.answer(json.dumps({'error': 'Giveaway not found'}))
+            
+            channels_info = [{
+                'title': channel.title,
+                'invite_link': channel.invite_link
+            } for channel in giveaway.channels]
+            
+            return await message.answer(json.dumps({'channels': channels_info}))
+        
+        elif action == 'check_subscriptions':
+            giveaway_id = data.get('giveaway_id')
+            giveaway = await get_giveaway_details(giveaway_id)
+            channel_ids = [channel.tg_id for channel in giveaway.channels]
+            
+            is_subscribed = await check_user_subscription(user_id, channel_ids, bot)
+            return await message.answer(json.dumps({'all_subscribed': is_subscribed}))
+        
+        elif action == 'participate':
+            giveaway_id = data.get('giveaway_id')
+            success = await join_giveaway(giveaway_id, user_id)
+            
+            if success:
+                return await message.answer(json.dumps({'status': 'success'}))
+            else:
+                return await message.answer(json.dumps({'error': 'Participation failed'}))
+            
+    except Exception as e:
+        logging.error(f"WebApp error: {e}")
+        return await message.answer(json.dumps({'error': 'Server error'}))
 
 
 @dp.message(F.text == "Создать розыгрыш")
@@ -402,50 +442,6 @@ async def process_select_winner(message: Message, state: FSMContext):
     
     await message.answer("Розыгрыш успешно завершен! Уведомления отправлены участникам.")
     await state.clear()
-
-# Добавьте в main.py
-
-@dp.message(F.web_app_data)
-async def handle_web_app_data(message: Message):
-    try:
-        data = json.loads(message.web_app_data.data)
-        action = data.get('action')
-        user_id = message.from_user.id
-        
-        if action == 'get_giveaway_info':
-            giveaway_id = data.get('giveaway_id')
-            giveaway = await get_giveaway_details(giveaway_id)
-            
-            if not giveaway:
-                return await message.answer(json.dumps({'error': 'Розыгрыш не найден'}))
-            
-            channels_info = [{
-                'title': channel.title,
-                'invite_link': channel.invite_link
-            } for channel in giveaway.channels]
-            
-            return await message.answer(json.dumps({'channels': channels_info}))
-        
-        elif action == 'check_subscriptions':
-            giveaway_id = data.get('giveaway_id')
-            giveaway = await get_giveaway_details(giveaway_id)
-            channel_ids = [channel.tg_id for channel in giveaway.channels]
-            
-            is_subscribed = await check_user_subscription(user_id, channel_ids, bot)
-            return await message.answer(json.dumps({'all_subscribed': is_subscribed}))
-        
-        elif action == 'participate':
-            giveaway_id = data.get('giveaway_id')
-            success = await join_giveaway(giveaway_id, user_id)
-            
-            if success:
-                return await message.answer(json.dumps({'status': 'success'}))
-            else:
-                return await message.answer(json.dumps({'error': 'Не удалось присоединиться'}))
-            
-    except Exception as e:
-        logging.error(f"WebApp error: {e}")
-        return await message.answer(json.dumps({'error': 'Internal server error'}))
 
 @dp.message(Command('get_giveaway_info'))
 async def get_giveaway_info(message: Message):

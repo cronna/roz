@@ -43,11 +43,6 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .status {
-            margin-left: auto;
-            font-size: 14px;
-            color: #666;
-        }
         .success-message {
             text-align: center;
             padding: 40px 20px;
@@ -61,68 +56,55 @@
 </head>
 <body>
     <div class="container">
-        <!-- Шаг 1: Кнопка участия -->
         <div id="step1">
             <button class="button" onclick="handleParticipate()">Участвовать</button>
         </div>
 
-        <!-- Шаг 2: Список каналов -->
         <div id="step2" class="hidden">
             <div class="channel-list" id="channelList"></div>
             <button class="button" onclick="checkSubscriptions()">Проверить подписки</button>
         </div>
 
-        <!-- Шаг 3: Успешное участие -->
         <div id="step3" class="hidden">
-            <div class="success-message">
-                🎉 Вы успешно приняли участие в розыгрыше!
-            </div>
+            <div class="success-message">🎉 Вы успешно приняли участие!</div>
         </div>
     </div>
 
     <script>
-        let tg = Telegram.WebApp;
+        const tg = Telegram.WebApp;
         let giveawayId = null;
 
-        // Инициализация WebApp
         tg.expand();
         tg.ready();
 
-        // Получаем ID розыгрыша из параметров
         function getGiveawayId() {
-            try {
-                const startParam = tg.initDataUnsafe.start_param;
-                return startParam.split('_')[1]; // giveaway_123 -> 123
-            } catch (e) {
-                return null;
-            }
+            const params = new URLSearchParams(tg.initDataUnsafe.start_param);
+            return params.get('giveaway_id');
         }
 
         async function handleParticipate() {
             giveawayId = getGiveawayId();
             if (!giveawayId) {
-                tg.showAlert('Ошибка: не найден розыгрыш');
+                tg.showAlert('Ошибка идентификации розыгрыша');
                 return;
             }
 
             try {
-                const response = await tg.sendData({
+                const result = await tg.sendData(JSON.stringify({
                     action: 'get_giveaway_info',
                     giveaway_id: giveawayId
-                });
+                }));
                 
-                const data = JSON.parse(response);
+                const data = JSON.parse(result);
                 
                 if (data.error) {
                     tg.showAlert(data.error);
                     return;
                 }
 
-                // Показываем список каналов
                 document.getElementById('step1').classList.add('hidden');
                 document.getElementById('step2').classList.remove('hidden');
                 
-                // Генерируем список каналов
                 const channelList = document.getElementById('channelList');
                 channelList.innerHTML = data.channels.map(channel => `
                     <div class="channel-item">
@@ -137,36 +119,29 @@
         }
 
         async function checkSubscriptions() {
-            tg.showPopup({
-                title: 'Проверка подписок',
-                message: 'Пожалуйста, подождите...',
-                buttons: []
-            });
-
+            tg.showPopup({title: 'Проверка...', message: 'Пожалуйста, подождите', buttons: []});
+            
             try {
-                const result = await tg.sendData({
+                const result = await tg.sendData(JSON.stringify({
                     action: 'check_subscriptions',
                     giveaway_id: giveawayId,
                     user_id: tg.initDataUnsafe.user.id
-                });
-
+                }));
+                
                 const response = JSON.parse(result);
                 
                 if (response.all_subscribed) {
-                    // Успешная проверка
                     document.getElementById('step2').classList.add('hidden');
                     document.getElementById('step3').classList.remove('hidden');
                     
-                    // Финализация участия
-                    const finalResult = await tg.sendData({
+                    await tg.sendData(JSON.stringify({
                         action: 'participate',
-                        giveaway_id: giveawayId,
-                        user_id: tg.initDataUnsafe.user.id
-                    });
+                        giveaway_id: giveawayId
+                    }));
                     
-                    setTimeout(() => tg.close(), 3000);
+                    setTimeout(() => tg.close(), 2000);
                 } else {
-                    tg.showAlert('Вы не подписаны на все каналы!');
+                    tg.showAlert('Подпишитесь на все каналы!');
                 }
             } catch (error) {
                 tg.showAlert('Ошибка проверки: ' + error.message);
