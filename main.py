@@ -1,6 +1,9 @@
+
 import logging
 import asyncio
 import time
+import hmac
+import hashlib
 from aiogram.types import WebAppInfo
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.fsm.context import FSMContext
@@ -8,11 +11,12 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.utils.web_app import check_webapp_signature, parse_init_data
 from models import async_main
 from requests import *
 from keyboards import *
 import json
+from urllib.parse import parse_qsl
+
 logging.basicConfig(level=logging.INFO)
 
 API_TOKEN = '7790467084:AAGYK-Gm60ailV6B0q5K4bOgNaQ01oOu0L0'
@@ -24,83 +28,11 @@ class GiveawayStates(StatesGroup):
     description = State()
     max_participants = State()
     add_channels = State()
-    select_winner = State() 
-# Инициализация бота и диспетчера
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
-
-# Команда /start с передачей параметра розыгрыша
-def validate_init_data(init_data: str) -> bool:
-    try:
-        if not check_webapp_signature(API_TOKEN, init_data):
-            return False
-        data = parse_init_data(init_data)
-        if (time.time() - int(data['auth_date'])) > 3600:
-            return False
-        return True
-    except:
-        return False
+    select_winner = State()
 
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
-    args = message.text.split()
-    if len(args) > 1 and args[1].startswith("giveaway_"):
-        giveaway_id = args[1].split("=")[1]
-        await message.answer(
-            "Нажмите кнопку, чтобы участвовать в розыгрыше:",
-            reply_markup=InlineKeyboardBuilder().button(
-                text="Участвовать",
-                web_app=WebAppInfo(url=f"https:///index.html?giveaway_id={giveaway_id}")
-            ).as_markup()
-        )
-    else:
-        await message.answer("Используйте ссылку с параметром розыгрыша.")
-
-@dp.message(F.web_app_data)
-async def handle_web_app_data(message: Message):
-    # Валидация данных
-    if not validate_init_data(message.web_app_data.init_data):
-        return await message.answer(json.dumps({'error': 'Invalid authorization'}))
-    
-    try:
-        data = json.loads(message.web_app_data.data)
-        action = data.get('action')
-        user_id = message.from_user.id
-        
-        if action == 'get_giveaway_info':
-            giveaway_id = data.get('giveaway_id')
-            giveaway = await get_giveaway_details(giveaway_id)
-            
-            if not giveaway:
-                return await message.answer(json.dumps({'error': 'Giveaway not found'}))
-            
-            channels_info = [{
-                'title': channel.title,
-                'invite_link': channel.invite_link
-            } for channel in giveaway.channels]
-            
-            return await message.answer(json.dumps({'channels': channels_info}))
-        
-        elif action == 'check_subscriptions':
-            giveaway_id = data.get('giveaway_id')
-            giveaway = await get_giveaway_details(giveaway_id)
-            channel_ids = [channel.tg_id for channel in giveaway.channels]
-            
-            is_subscribed = await check_user_subscription(user_id, channel_ids, bot)
-            return await message.answer(json.dumps({'all_subscribed': is_subscribed}))
-        
-        elif action == 'participate':
-            giveaway_id = data.get('giveaway_id')
-            success = await join_giveaway(giveaway_id, user_id)
-            
-            if success:
-                return await message.answer(json.dumps({'status': 'success'}))
-            else:
-                return await message.answer(json.dumps({'error': 'Participation failed'}))
-            
-    except Exception as e:
-        logging.error(f"WebApp error: {e}")
-        return await message.answer(json.dumps({'error': 'Server error'}))
+    pass
 
 
 @dp.message(F.text == "Создать розыгрыш")
