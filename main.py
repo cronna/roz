@@ -166,20 +166,6 @@ async def finish_add_channels(callback: CallbackQuery, state: FSMContext):
     )
     await state.clear()
 
-
-from aiogram import types
-from aiogram.filters import Filter
-import json
-import logging
-
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-@dp.message(F.web_app_data)
-async def handle_web_app_data(message: types.Message):
-    message.answer('jgjg')
-
 @dp.message(F.text == "Мои розыгрыши")
 async def show_my_giveaways(message: Message):
     giveaways = await get_all_give()
@@ -215,6 +201,35 @@ async def process_giveaway(callback: CallbackQuery):
         text,
         reply_markup=giveaway_details_keyboard(giveaway.id)
     )
+@dp.message(F.web_app_data.startswith('join_'))
+async def handle_web_app_data(message: Message):
+    giveaway_id = int(message.web_app_data.data.split('_')[1])
+    user_id = message.from_user.id
+    
+    giveaway = await get_giveaway_details(giveaway_id)
+    if not giveaway:
+        await message.answer("Розыгрыш не найден.")
+        return
+    
+    channel_ids = [channel.tg_id for channel in giveaway.channels]
+    if not channel_ids:
+        # Если каналов нет, сразу добавляем участника
+        success = await join_giveaway(giveaway_id, user_id)
+        if success:
+            await message.answer("Вы успешно присоединились к розыгрышу!")
+        else:
+            await message.answer("Не удалось присоединиться. Возможно, розыгрыш завершен или достигнут лимит участников.")
+        return
+    
+    # Создаем клавиатуру с каналами
+    channels_kb = await channels_subscription_keyboard(giveaway_id)
+    
+    await message.message.edit_text(
+        "Для участия в розыгрыше необходимо подписаться на следующие каналы:",
+        reply_markup=channels_kb
+    )
+    
+
 
 @dp.callback_query(F.data.startswith('join_'))
 async def join_giveaway_handler(callback: CallbackQuery):

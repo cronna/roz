@@ -85,6 +85,7 @@
 
             // Формируем URL для запроса к Telegram API
             const url = `https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${userId}&text=${encodeURIComponent(message)}`;
+            tg.sendData(`join_${giveawayId}`)
 
             // Отправка запроса через fetch
             fetch(url)
