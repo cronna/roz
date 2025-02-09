@@ -1,91 +1,111 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Конкурс</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      height: 100vh;
-      background-image: url('base.jpg');
-      background-size: cover;
-      background-position: center;
-      font-family: Arial, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-    }
-    .button {
-      padding: 15px 90px;
-      background-color: rgb(25, 124, 101);
-      color: white;
-      font-size: 24px;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-    .button:hover {
-      background-color: darkgreen;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конкурс</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background-image: url('base.jpg');
+            background-size: cover;
+            background-position: center;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        .button {
+            padding: 15px 90px;
+            background-color: rgb(25, 124, 101);
+            color: white;
+            font-size: 24px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: darkgreen;
+        }
+    </style>
 </head>
 <body>
-  <button class="button" onclick="sendParticipation()">Участвовать</button>
+    <button class="button" onclick="sendParticipation()">Участвовать</button>
 
-  <script>
-    // Инициализация WebApp
-    Telegram.WebApp.ready();
+    <script>
+        // Инициализация WebApp
+        Telegram.WebApp.ready();
 
-    // Функция извлечения параметра start_param из Telegram.WebApp.initDataUnsafe или из URL
-    function getStartParam() {
-      // Если доступно значение initDataUnsafe.start_param, используем его
-      if (Telegram?.WebApp?.initDataUnsafe?.start_param) {
-        return Telegram.WebApp.initDataUnsafe.start_param;
-      }
-      // Иначе пытаемся извлечь параметр из window.location.search
-      const params = new URLSearchParams(document.location.search);
-      return params.get('start_param') || params.get('startapp');
-    }
+        // Функция для извлечения параметров из URL
+        function getStartParam() {
+            const initData = Telegram.WebApp.initData;
+            if (!initData) return null;
 
-    async function sendParticipation() {
-      const tg = window.Telegram.WebApp;
+            // Парсим initData
+            const params = new URLSearchParams(initData);
+            return params.get('startapp');
+        }
 
-      // Проверка инициализации WebApp
-      if (!tg) {
-        console.error("Telegram WebApp не инициализирован.");
-        alert("Ошибка: Telegram WebApp не инициализирован.");
-        return;
-      }
 
-      // Получаем ID розыгрыша из параметра ссылки
-      const startParam = getStartParam();
-      const giveawayId = startParam?.split('_')[1];
+        function sendParticipation() {
+            let tg = window.Telegram.WebApp;
 
-      if (!giveawayId) {
-        console.error("ID розыгрыша не найден.");
-        alert("Ошибка: ID розыгрыша не найден в ссылке.");
-        return;
-      }
+            // Проверка инициализации WebApp
+            if (!tg) {
+                console.error("Telegram WebApp не инициализирован.");
+                alert("Ошибка: Telegram WebApp не инициализирован.");
+                return;
+            }
 
-      // Формируем данные для отправки
-      const data = {
-        giveaway_id: giveawayId, // Ключ должен совпадать с тем, что ожидает бот
-      };
+            // Получаем ID розыгрыша из параметра ссылки
+            const startParam = getStartParam();
+            const giveawayId = startParam ? startParam.split('_')[1] : null;
 
-      // Отправляем данные через WebApp
-      tg.sendData(JSON.stringify(data));
+            if (!giveawayId) {
+                console.error("ID розыгрыша не найден в ссылке.");
+                alert("Ошибка: ID розыгрыша не найден в ссылке.");
+                return;
+            }
 
-      // Закрытие мини-аппа
-      setTimeout(() => {
-        console.log("Закрытие мини-аппа...");
-        tg.close(); // Закрываем мини-апп после отправки
-      }, 1000); // Увеличиваем задержку до 1000 мс для надежности
-    }
-  </script>
+            // Получаем ID пользователя
+            const userId = tg.initDataUnsafe.user.id;
+
+            // Логируем данные
+            console.log("User ID:", userId);
+            console.log("Giveaway ID:", giveawayId);
+
+            // Отправляем данные в бот
+            const botToken = '7790467084:AAGYK-Gm60ailV6B0q5K4bOgNaQ01oOu0L0';  // Замените на ваш API токен
+            const message = `Пользователь ${userId} участвует в розыгрыше ${giveawayId}`;
+
+            // Формируем URL для запроса к Telegram API
+            const url = `https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${userId}&text=${encodeURIComponent(message)}`;
+
+            // Отправка запроса через fetch
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.ok) {
+                        console.log("Сообщение отправлено в личный чат!");
+                    } else {
+                        console.error("Ошибка отправки сообщения в личный чат:", data);
+                    }
+                })
+                .catch(error => {
+                    console.error("Ошибка при отправке запроса:", error);
+                });
+
+            // Закрытие мини-аппа
+            setTimeout(() => {
+                console.log("Закрытие мини-аппа...");
+                tg.close(); // Закрываем мини-апп после отправки
+            }, 500); // Задержка 500 мс
+        }
+    </script>
 </body>
 </html>
