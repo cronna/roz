@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конкурс</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background-image: url('{{ url_for("static", filename="base.jpg") }}');
+            background-size: cover;
+            background-position: center;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        .button {
+            padding: 15px 90px;
+            background-color: #197c65;
+            color: white;
+            font-size: 24px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #006400;
+        }
+    </style>
+</head>
+<body>
+    <button class="button" onclick="handleParticipation()">Участвовать</button>
+
+    <script>
+        Telegram.WebApp.ready();
+        
+        function handleParticipation() {
+            const tg = window.Telegram.WebApp;
+            const giveawayId = "{{ giveaway_id }}";
+            const userId = tg.initDataUnsafe.user?.id;
+
+            if (!userId || !giveawayId) {
+                alert('Ошибка: Не удалось получить данные участника');
+                return;
+            }
+
+            fetch('/participate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    giveaway_id: giveawayId
+                })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Ошибка сети');
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    setTimeout(() => tg.close(), 300);
+                } else {
+                    throw new Error(data.message || 'Неизвестная ошибка');
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                alert(error.message);
+            });
+        }
+    </script>
+</body>
+</html>

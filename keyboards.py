@@ -1,6 +1,7 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from requests import *
+from aiogram.types import WebAppInfo
 
 def main_menu():
     return ReplyKeyboardMarkup(
@@ -92,3 +93,9 @@ async def giveaway_management_keyboard(giveaway_id):
     
     builder.adjust(1)
     return builder.as_markup()
+
+
+async def partic_btn(url):
+    return ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text='учавствовать', web_app=WebAppInfo(url=url))]
+    ])

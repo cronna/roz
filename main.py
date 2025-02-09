@@ -154,15 +154,14 @@ async def finish_add_channels(callback: CallbackQuery, state: FSMContext):
     giveaway_id = data['giveaway_id']
     
     # Генерируем deep link
-    deep_link = f"https://t.me/givegive2323bot/givegive2323bot?start=giveaway_{giveaway_id}"
+    deep_link = f"https://t.me/givegive2323bot/givegive2323bot?startapp=giveaway_{giveaway_id}"
     
     # Сохраняем ссылку в базе данных
     await set_give_link(giveaway_id, deep_link)
     
     await callback.message.answer(
-        f"🎉 Розыгрыш создан!\n\n"
-        f"Ссылка для участия: {deep_link}",
-        reply_markup=main_menu()
+        f"🎉 Розыгрыш создан!\n\n",
+        reply_markup=await partic_btn(deep_link)
     )
     await state.clear()
 
@@ -201,33 +200,37 @@ async def process_giveaway(callback: CallbackQuery):
         text,
         reply_markup=giveaway_details_keyboard(giveaway.id)
     )
-@dp.message(F.web_app_data.startswith('join_'))
+
+
+    
+@dp.message(F.web_app_data)
 async def handle_web_app_data(message: Message):
-    giveaway_id = int(message.web_app_data.data.split('_')[1])
-    user_id = message.from_user.id
+    # giveaway_id = int(message.web_app_data.data.split('_')[1])
+    # user_id = message.from_user.id
     
-    giveaway = await get_giveaway_details(giveaway_id)
-    if not giveaway:
-        await message.answer("Розыгрыш не найден.")
-        return
+    # giveaway = await get_giveaway_details(giveaway_id)
+    # if not giveaway:
+    #     await message.answer("Розыгрыш не найден.")
+    #     return
     
-    channel_ids = [channel.tg_id for channel in giveaway.channels]
-    if not channel_ids:
-        # Если каналов нет, сразу добавляем участника
-        success = await join_giveaway(giveaway_id, user_id)
-        if success:
-            await message.answer("Вы успешно присоединились к розыгрышу!")
-        else:
-            await message.answer("Не удалось присоединиться. Возможно, розыгрыш завершен или достигнут лимит участников.")
-        return
+    # channel_ids = [channel.tg_id for channel in giveaway.channels]
+    # if not channel_ids:
+    #     # Если каналов нет, сразу добавляем участника
+    #     success = await join_giveaway(giveaway_id, user_id)
+    #     if success:
+    #         await message.answer("Вы успешно присоединились к розыгрышу!")
+    #     else:
+    #         await message.answer("Не удалось присоединиться. Возможно, розыгрыш завершен или достигнут лимит участников.")
+    #     return
     
-    # Создаем клавиатуру с каналами
-    channels_kb = await channels_subscription_keyboard(giveaway_id)
+    # # Создаем клавиатуру с каналами
+    # channels_kb = await channels_subscription_keyboard(giveaway_id)
     
-    await message.message.edit_text(
-        "Для участия в розыгрыше необходимо подписаться на следующие каналы:",
-        reply_markup=channels_kb
-    )
+    # await message.message.edit_text(
+    #     "Для участия в розыгрыше необходимо подписаться на следующие каналы:",
+    #     reply_markup=channels_kb
+    # )
+    await message.answer('lfff')
     
 
 
