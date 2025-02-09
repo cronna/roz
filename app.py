@@ -75,3 +75,5 @@ def handle_participation():
     except requests.RequestException as e:
         return jsonify({'status': 'error', 'message': f'Ошибка отправки: {str(e)}'}), 500
 
+if __name__ == '__main__':
+    app.run(debug=True)
