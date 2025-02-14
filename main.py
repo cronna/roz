@@ -1,26 +1,17 @@
-
-import logging
 import asyncio
-import time
-import hmac
-import hashlib
-from aiogram.types import WebAppInfo
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from models import async_main
-from requests import *
+from src.models import async_main
 from keyboards import *
 import json
-from urllib.parse import parse_qsl
 from app import app
 
 logging.basicConfig(level=logging.INFO)
 
-API_TOKEN = '7790467084:AAGYK-Gm60ailV6B0q5K4bOgNaQ01oOu0L0'
+API_TOKEN = '8194187894:AAGmqMe6Nw0oZn9f77UpciKR4qf8GatZZ1w'
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 

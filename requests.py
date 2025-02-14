@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 import logging
-from models import async_session, User, Giveaway, GiveawayParticipant, Channel
+from src.models import async_session, User, Giveaway, GiveawayParticipant, Channel
 
 async def add_user(tg_user):
     async with async_session() as session:

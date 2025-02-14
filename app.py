@@ -1,13 +1,21 @@
-from flask import Flask, render_template, request, jsonify
+from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
+
 import os
-import requests
+
+from uvicorn import run
+
+import httpx
+
 import asyncio
-from markupsafe import Markup
-from models import Giveaway
 from requests import get_giveaway_details, join_giveaway
 
-app = Flask(__name__)
-app.config['BOT_TOKEN'] = os.environ.get('BOT_TOKEN', '7790467084:AAGYK-Gm60ailV6B0q5K4bOgNaQ01oOu0L0')
+app = FastAPI()
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8194187894:AAGmqMe6Nw0oZn9f77UpciKR4qf8GatZZ1w')
+
+templates = Jinja2Templates(directory="templates")
+
 
 def run_async(coro):
     try:
@@ -19,61 +27,60 @@ def run_async(coro):
         return None
     finally:
         loop.close()
-        
-@app.route('/')
-def index():
-    start_param = request.args.get('start_param', '')
-    giveaway_id = start_param.split('_')[1] if '_' in start_param and start_param.split('_')[1].isdigit() else ''
-   
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request, start_param: str = ''):
+    giveaway_id = start_param.split('_')[1] if '_' in start_param and start_param.split('_')[1].isdigit() else None
+
     if not giveaway_id:
-        return render_template('error.html', message='Некорректный ID розыгрыша')
-   
+        return templates.TemplateResponse("error.html", {"request": request, "message": "Некорректный ID розыгрыша"})
     giveaway = run_async(get_giveaway_details(int(giveaway_id)))
-   
+
     if not giveaway:
-        return render_template('error.html', message='Розыгрыш не найден')
-   
+        return templates.TemplateResponse("error.html", {"request": request, "message": "Розыгрыш не найден"})
     giveaway_data = {
         'id': giveaway.id,
         'name': giveaway.name,
         'description': giveaway.description,
         'participants': giveaway.participants,
         'max_participants': giveaway.max_participants,
-        'is_active': giveaway.is_active,  # передаём как Boolean
+        'is_active': giveaway.is_active,
         'channels': [{'title': channel.title} for channel in getattr(giveaway, 'channels', [])]
     }
-   
-    return render_template('index.html', giveaway=giveaway_data)
 
-@app.route('/participate', methods=['POST'])
-def handle_participation():
-    data = request.json or {}
+    return templates.TemplateResponse("index.html", {"request": request, "giveaway": giveaway_data})
+
+
+@app.post("/participate")
+async def handle_participation(request: Request):
+    data = await request.json()
     user_id = data.get('user_id')
     giveaway_id = data.get('giveaway_id')
 
     if not user_id or not giveaway_id:
-        return jsonify({'status': 'error', 'message': 'Недостаточно данных'}), 400
-
+        raise HTTPException(status_code=400, detail='Недостаточно данных')
     try:
-        success = run_async(join_giveaway(giveaway_id, user_id))
+        success = await join_giveaway(giveaway_id, user_id)
         if not success:
-            return jsonify({'status': 'error', 'message': 'Не удалось присоединиться к розыгрышу'}), 400
+            raise HTTPException(status_code=400, detail='Не удалось присоединиться к розыгрышу')
     except Exception as e:
-        return jsonify({'status': 'error', 'message': f'Ошибка обработки: {str(e)}'}), 500
+        raise HTTPException(status_code=500, detail=f'Ошибка обработки: {str(e)}')
 
-    bot_token = app.config['BOT_TOKEN']
-    if not bot_token:
-        return jsonify({'status': 'error', 'message': 'Отсутствует токен бота'}), 500
+    if not BOT_TOKEN:
+        raise HTTPException(status_code=500, detail='Отсутствует токен бота')
 
     message = f"🎉 Вы успешно участвуете в розыгрыше!\nID розыгрыша: {giveaway_id}"
-    api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    
-    try:
-        response = requests.post(api_url, json={'chat_id': user_id, 'text': message})
-        response.raise_for_status()
-        return jsonify({'status': 'success'})
-    except requests.RequestException as e:
-        return jsonify({'status': 'error', 'message': f'Ошибка отправки: {str(e)}'}), 500
+
+    async with httpx.AsyncClient() as client:
+        api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        try:
+            response = await client.post(api_url, json={'chat_id': user_id, 'text': message})
+            response.raise_for_status()
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=500, detail=f'Ошибка отправки: {str(e)}')
+
+    return JSONResponse(content={'status': 'success'})
 
 
-    
+run(app)
