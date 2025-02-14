@@ -11,7 +11,7 @@ from app import app
 
 logging.basicConfig(level=logging.INFO)
 
-API_TOKEN = '8194187894:AAGmqMe6Nw0oZn9f77UpciKR4qf8GatZZ1w'
+API_TOKEN = '7790467084:AAGYK-Gm60ailV6B0q5K4bOgNaQ01oOu0L0'
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 

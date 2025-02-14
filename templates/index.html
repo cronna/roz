@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конкурс</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            background: url('{{ url_for("static", filename="base.jpg") }}') no-repeat center/cover;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .content {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 15px;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0 0 15px;
+            font-size: 26px;
+        }
+
+        .info-block {
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #00b894;
+        }
+
+        .button {
+            padding: 12px 30px;
+            background-color: #00b894;
+            color: white;
+            font-size: 20px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .button:hover {
+            background-color: #008c74;
+        }
+
+        .button:disabled {
+            background-color: gray;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="content">
+        <h1>{{ giveaway.name }}</h1>
+        <div class="info-block">
+            <span class="info-label">Описание:</span> {{ giveaway.description }}
+        </div>
+        <div class="info-block">
+            <span class="info-label">Участников:</span> {{ giveaway.participants }} / {{ giveaway.max_participants }}
+        </div>
+        <div class="info-block">
+            <span class="info-label">Статус:</span> {{ "Активен" if giveaway.is_active else "Завершен" }}
+        </div>
+        <button class="button" id="participate-button" onclick="handleParticipation()" {% if not giveaway.is_active %}disabled{% endif %}>
+            {{ 'Участвовать' if giveaway.is_active else 'Розыгрыш завершен' }}
+        </button>
+    </div>
+    <script>
+        // Проверяем доступность Telegram WebApp
+        if (window.Telegram && Telegram.WebApp) {
+            Telegram.WebApp.ready();
+        } else {
+            console.error("Ошибка: Telegram WebApp недоступен.");
+        }
+
+        const tg = window.Telegram.WebApp;
+        const giveawayId = "{{ giveaway.id }}";  // id розыгрыша
+        const userId = tg?.initDataUnsafe?.user?.id;  // id пользователя из данных WebApp
+        const isActive = {{ giveaway.is_active | tojson }};  // Конвертируем значение в JSON для корректной работы в JavaScript
+        const button = document.getElementById("participate-button");
+
+        // Функция для обработки участия
+        function handleParticipation() {
+            if (!isActive) {
+                alert("Этот розыгрыш уже завершен");
+                return;
+            }
+
+            if (!userId || !giveawayId) {
+                alert("Ошибка: Не удалось получить данные участника");
+                return;
+            }
+
+            // Формируем данные для отправки в бота
+            const data = JSON.stringify({ user_id: userId, giveaway_id: giveawayId });
+            tg.sendData(data);  // Отправляем данные в Telegram бота
+            button.innerText = "Запрос отправлен...";
+            button.disabled = true;
+            setTimeout(() => tg.close(), 1000);  // Закрываем WebApp после отправки данных
+        }
+    </script>
+</body>
+
+</html>
